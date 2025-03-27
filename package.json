@@ -15,7 +15,7 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "format": "eslint . --fix",
+    "fix": "eslint . --fix",
     "typecheck": "tsc",
     "build": "tsc --noEmit false",
     "dev": "tsc-watch --onSuccess \"tsx ./src/main.ts\"",
@@ -26,29 +26,33 @@
   "dependencies": {
     "@grammyjs/auto-chat-action": "0.1.1",
     "@grammyjs/commands": "1.0.5",
+    "@grammyjs/conversations": "^2.0.1",
     "@grammyjs/hydrate": "1.4.1",
     "@grammyjs/i18n": "1.1.2",
     "@grammyjs/parse-mode": "1.11.1",
     "@grammyjs/runner": "2.0.3",
     "@grammyjs/types": "3.19.0",
-    "@hono/node-server": "1.14.0",
+    "@hono/node-server": "1.13.8",
     "callback-data": "1.1.1",
-    "grammy": "1.35.1",
-    "hono": "4.7.5",
+    "grammy": "1.35.0",
+    "hono": "4.7.2",
     "iso-639-1": "3.1.5",
+    "openai": "^4.89.1",
+    "pg": "^8.14.1",
     "pino": "9.6.0",
     "pino-pretty": "13.0.0",
     "tsx": "4.19.3",
     "valibot": "0.42.1"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "4.10.1",
-    "@types/node": "^22.13.10",
-    "eslint": "^9.23.0",
+    "@antfu/eslint-config": "4.3.0",
+    "@types/node": "^22.13.4",
+    "@types/pg": "^8.11.11",
+    "eslint": "^9.20.1",
     "husky": "^9.1.7",
-    "lint-staged": "^15.5.0",
+    "lint-staged": "^15.4.3",
     "tsc-watch": "^6.2.1",
-    "typescript": "^5.8.2"
+    "typescript": "^5.7.3"
   },
   "lint-staged": {
     "*.ts": "eslint"

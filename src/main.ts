@@ -1,7 +1,8 @@
 #!/usr/bin/env tsx
 /* eslint-disable antfu/no-top-level-await */
 
-import type { PollingConfig, WebhookConfig } from '#root/config.js'
+import type { Bot } from '#root/bot/index.js'
+import type { Config, PollingConfig, WebhookConfig } from '#root/config.js'
 import type { RunnerHandle } from '@grammyjs/runner'
 import process from 'node:process'
 import { createBot } from '#root/bot/index.js'
@@ -9,12 +10,55 @@ import { config } from '#root/config.js'
 import { logger } from '#root/logger.js'
 import { createServer, createServerManager } from '#root/server/index.js'
 import { run } from '@grammyjs/runner'
+import pg from 'pg'
 
-async function startPolling(config: PollingConfig) {
-  const bot = createBot(config.botToken, {
+async function createPostgreClient(config: Config) {
+  if (config.databaseString) {
+    try {
+      const client = new pg.Client({
+        connectionString: config.databaseString,
+      })
+      await client.connect()
+      logger.info('Successfully connected to database')
+      return client
+    }
+    catch (error) {
+      logger.error(error, 'Error connection to postgres')
+    }
+  }
+  return undefined
+}
+
+async function startServer(bot: Bot, config: Config) {
+  const server = createServer({
+    bot,
     config,
     logger,
   })
+  const serverManager = createServerManager(server, {
+    host: config.serverHost,
+    port: config.serverPort,
+  })
+
+  // graceful shutdown
+  onShutdown(async () => {
+    logger.info('Shutdown')
+    await serverManager.stop()
+  })
+
+  // start server
+  const info = await serverManager.start()
+  logger.info({
+    msg: 'Server started',
+    url: info.url,
+  })
+}
+
+async function startPolling(config: PollingConfig) {
+  const bot = await createBot(config.botToken, {
+    config,
+    logger,
+  }, undefined, await createPostgreClient(config))
   let runner: undefined | RunnerHandle
 
   // graceful shutdown
@@ -41,38 +85,19 @@ async function startPolling(config: PollingConfig) {
     msg: 'Bot running...',
     username: bot.botInfo.username,
   })
+
+  await startServer(bot, config)
 }
 
 async function startWebhook(config: WebhookConfig) {
-  const bot = createBot(config.botToken, {
+  const bot = await createBot(config.botToken, {
     config,
     logger,
-  })
-  const server = createServer({
-    bot,
-    config,
-    logger,
-  })
-  const serverManager = createServerManager(server, {
-    host: config.serverHost,
-    port: config.serverPort,
-  })
+  }, undefined, await createPostgreClient(config))
 
-  // graceful shutdown
-  onShutdown(async () => {
-    logger.info('Shutdown')
-    await serverManager.stop()
-  })
-
-  // to prevent receiving updates before the bot is ready
   await bot.init()
 
-  // start server
-  const info = await serverManager.start()
-  logger.info({
-    msg: 'Server started',
-    url: info.url,
-  })
+  await startServer(bot, config)
 
   // set webhook
   await bot.api.setWebhook(config.botWebhook, {
@@ -90,6 +115,7 @@ try {
     await startWebhook(config)
   else if (config.isPollingMode)
     await startPolling(config)
+  // testNetwork()
 }
 catch (error) {
   logger.error(error)

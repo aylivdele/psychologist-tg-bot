@@ -1,16 +1,18 @@
-import type { Context } from '#root/bot/context.js'
+import type { Context, ConversationContext } from '#root/bot/context.js'
+
 import type { Config } from '#root/config.js'
 import type { Logger } from '#root/logger.js'
 import type { BotConfig } from 'grammy'
+import type pg from 'pg'
 import { adminFeature } from '#root/bot/features/admin.js'
-import { languageFeature } from '#root/bot/features/language.js'
 import { unhandledFeature } from '#root/bot/features/unhandled.js'
 import { welcomeFeature } from '#root/bot/features/welcome.js'
 import { errorHandler } from '#root/bot/handlers/error.js'
-import { i18n, isMultipleLocales } from '#root/bot/i18n.js'
+import { localize } from '#root/bot/i18n.js'
 import { session } from '#root/bot/middlewares/session.js'
 import { updateLogger } from '#root/bot/middlewares/update-logger.js'
 import { autoChatAction } from '@grammyjs/auto-chat-action'
+import { conversations } from '@grammyjs/conversations'
 import { hydrate } from '@grammyjs/hydrate'
 import { hydrateReply, parseMode } from '@grammyjs/parse-mode'
 import { sequentialize } from '@grammyjs/runner'
@@ -25,7 +27,7 @@ function getSessionKey(ctx: Omit<Context, 'session'>) {
   return ctx.chat?.id.toString()
 }
 
-export function createBot(token: string, dependencies: Dependencies, botConfig?: BotConfig<Context>) {
+export function createBot(token: string, dependencies: Dependencies, botConfig?: BotConfig<Context>, dbClient?: pg.Client) {
   const {
     config,
     logger,
@@ -56,15 +58,17 @@ export function createBot(token: string, dependencies: Dependencies, botConfig?:
   protectedBot.use(hydrate())
   protectedBot.use(session({
     getSessionKey,
-    storage: new MemorySessionStorage(),
+    // @ts-expect-error not possible to set generic type of PsqlAdapter
+    storage: dbClient ? (await PsqlAdapter.create({ client: dbClient, tableName: 'psycho-session' })) : new MemorySessionStorage<SessionData>(),
   }))
-  protectedBot.use(i18n)
+  protectedBot.use(localize)
+  protectedBot.use(conversations<Context, ConversationContext>({
+    plugins: [autoChatAction(bot.api), hydrateReply, hydrate()],
+  }))
 
   // Handlers
   protectedBot.use(welcomeFeature)
   protectedBot.use(adminFeature)
-  if (isMultipleLocales)
-    protectedBot.use(languageFeature)
 
   // must be the last handler
   protectedBot.use(unhandledFeature)
